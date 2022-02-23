@@ -1,0 +1,99 @@
+---
+title: "OmniATAC_ImpulseDE2_bytime"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+#Load in the observed counts matrix
+matObservedCounts <- as.matrix(read.csv("OmniATAC_bothruns_multicov_forDESeq.tsv",sep="\t",row.names="contig_start_end"))
+
+#Load in the sample information
+dfAnnotation <- read.csv("OmniATAC_ImpulseDE2_sample_matrix_time_is_hpf.tsv", sep="\t", row.names=1)
+
+#Display the sample information
+dfAnnotation
+```
+
+
+```{r}
+library(ImpulseDE2)
+
+#run ImpulseDE2
+objectImpulseDE2 <- runImpulseDE2(
+  matCountData    = matObservedCounts, 
+  dfAnnotation    = dfAnnotation,
+  boolCaseCtrl    = FALSE,
+  boolIdentifyTransients = TRUE,
+  vecConfounders  = NULL,
+  scaNProc        = 12 )
+
+#display results
+head(objectImpulseDE2$dfImpulseDE2Results)
+
+#output results
+write.csv(objectImpulseDE2$dfImpulseDE2Results, 
+          file="OmniATAC-Seq_bothruns_ImpulseDE2_bytime.csv")
+```
+
+
+```{r}
+load('OmniATAC-Seq_bothruns_IDE2object_thpf.RData')
+```
+
+
+
+```{r}
+library(ImpulseDE2)
+library(dplyr)
+library(tidyr)
+
+sorted_ImpulseDE2_bypadj <- objectImpulseDE2@dfImpulseDE2Results[order(objectImpulseDE2@dfImpulseDE2Results$padj), ]
+sorted_ImpulseDE2_bypadj_noNA <- sorted_ImpulseDE2_bypadj %>% drop_na(Gene)
+dummy <- list()
+
+i = 1
+for(item in sorted_ImpulseDE2_bypadj_noNA$Gene){
+  vecImpulseParam <- get_lsModelFits(obj = objectImpulseDE2)$case[[item]]$lsImpulseFit$vecImpulseParam
+  dummy[[i]] <- c(item, vecImpulseParam)
+  i = i + 1
+}
+
+ImpulseParams <- as.data.frame(data.table::transpose(dummy), col.names = names(dummy[[1]]))
+names(ImpulseParams)[1] <- "contig_start_end"
+ImpulseParams
+
+write.csv(ImpulseParams, 
+          file="OmniATAC-Seq_bothruns_ImpulseDE2_ImpulseParams_thpf.csv")
+
+save.image(file='ImpulseDE2_downstream_analyses_thpf.RData')
+```
+
+```{r}
+library(ComplexHeatmap)
+lsHeatmaps <- plotHeatmap(
+  objectImpulseDE2       = objectImpulseDE2,
+  strCondition           = "case",
+  boolIdentifyTransients = TRUE,
+  scaQThres              = 0.01)
+```
+
+
+```{r}
+pdf("IDE2_complexheatmap.pdf", width = 5, height = 5)
+
+draw(lsHeatmaps$complexHeatmapRaw)
+
+dev.off()
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+

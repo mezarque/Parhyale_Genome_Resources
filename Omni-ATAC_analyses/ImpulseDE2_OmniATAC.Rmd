@@ -1,0 +1,249 @@
+---
+title: "ImpulseDE2_OmniATAC"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+
+matObservedCounts <- as.matrix(read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/OmniATAC_peaks/OmniATAC_q005_multicov_forDESeq_noS21S22.tsv",sep="\t",row.names="contig_start_end"))
+
+dfAnnotation <- read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/OmniATAC_peaks/OmniATAC_ImpulseDE2_sample_matrix_noS21S22.tsv", sep="\t", row.names=1)
+
+dfAnnotation
+```
+
+
+```{r}
+library(ImpulseDE2)
+
+objectImpulseDE2 <- runImpulseDE2(
+  matCountData    = matObservedCounts, 
+  dfAnnotation    = dfAnnotation,
+  boolCaseCtrl    = FALSE,
+  boolIdentifyTransients = TRUE,
+  vecConfounders  = NULL,
+  scaNProc        = 8 )
+```
+
+```{r}
+head(objectImpulseDE2$dfImpulseDE2Results)
+
+write.csv(objectImpulseDE2$dfImpulseDE2Results, 
+          file="OmniATAC-Seq_ImpulseDE2_noS21S22.csv")
+```
+
+
+```{r}
+library(ggplot2)
+
+gene <- "phaw_50.004430_12941055_12941969"
+
+pdf(file = paste(gene, "_noS21S22_Kr_p3.pdf", sep = ""), width = 7, height = 5)
+
+lsgplotsGenes <- plotGenes(
+  vecGeneIDs       = {gene},
+  scaNTopIDs       = NULL,
+  objectImpulseDE2 = objectImpulseDE2,
+  boolCaseCtrl     = FALSE,
+  dirOut           = NULL,
+  strFileName      = NULL,
+  vecRefPval       = NULL, 
+  strNameRefMethod = NULL)
+print(lsgplotsGenes[[1]])
+
+dev.off()
+```
+
+
+```{r}
+library(ComplexHeatmap)
+lsHeatmaps <- plotHeatmap(
+  objectImpulseDE2       = objectImpulseDE2,
+  strCondition           = "case",
+  boolIdentifyTransients = FALSE,
+  scaQThres              = 0.01)
+draw(lsHeatmaps$complexHeatmapRaw) # Heatmap based on normalised counts
+```
+
+
+```{r}
+matObservedCounts2 <- as.matrix(read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/OmniATAC_q005_multicov_forDESeq_PC2_flattened.csv", row.names=1))
+
+matObservedCounts2 <- ceiling(matObservedCounts2)
+matObservedCounts2[matObservedCounts2 < 0] <- 0
+
+dfAnnotation <- read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/OmniATAC_peaks/OmniATAC_ImpulseDE2_sample_matrix.tsv", sep="\t", row.names=1)
+
+dfAnnotation
+```
+
+```{r}
+library(ImpulseDE2)
+
+objectImpulseDE2_2 <- runImpulseDE2(
+  matCountData    = matObservedCounts2, 
+  dfAnnotation    = dfAnnotation,
+  boolCaseCtrl    = FALSE,
+  boolIdentifyTransients = TRUE,
+  vecConfounders  = NULL,
+  scaNProc        = 8 )
+```
+
+```{r}
+head(objectImpulseDE2_2$dfImpulseDE2Results)
+
+write.csv(objectImpulseDE2_2$dfImpulseDE2Results, 
+          file="OmniATAC-Seq_ImpulseDE2_PC2_flattened.csv")
+```
+
+```{r}
+ImpulseDE2_Results_df <- data.frame(objectImpulseDE2_2$dfImpulseDE2Results)
+
+ImpulseDE2_Results_df <- ImpulseDE2_Results_df[order(ImpulseDE2_Results_df$padj),]
+write.csv(ImpulseDE2_Results_df, 
+          file="OmniATAC-Seq_ImpulseDE2_PC2_flattened_sorted.csv")
+```
+
+```{r}
+ImpulseDE2_Results_df
+```
+
+
+
+```{r}
+library(ggplot2)
+
+gene <- "phaw_50.000003_4294_5683"
+
+#pdf(file = paste(gene, "_PC2_flattened.pdf", sep = ""), width = 7, height = 5)
+
+lsgplotsGenes <- plotGenes(
+  vecGeneIDs       = {gene},
+  scaNTopIDs       = NULL,
+  objectImpulseDE2 = objectImpulseDE2,
+  boolCaseCtrl     = FALSE,
+  dirOut           = NULL,
+  strFileName      = NULL,
+  vecRefPval       = NULL, 
+  strNameRefMethod = NULL)
+print(lsgplotsGenes[[1]])
+
+#dev.off()
+
+impulse_model <- function(vecImpulseParam, t) {
+  beta = vecImpulseParam[1]
+  h0 = vecImpulseParam[2]
+  h1 = vecImpulseParam[3]
+  h2 = vecImpulseParam[4]
+  t1 = vecImpulseParam[5]
+  t2 = vecImpulseParam[6]
+  return(1/h1 * (h0 + (h1 - h0)) * 1 / (1 + exp(1)^(-beta * (t - t1))) * (h2 + (h1-h2) * (1 / 1 + exp(1)^(beta * (t - t2)))))
+}
+
+testParam <- c(2.279322, 137.7013, 52.95285, 112.0339, 19.65589, 20.56886)
+
+t <- seq(13, 27)
+plot(t, impulse_model(testParam, t))
+```
+
+```{r}
+matObservedCounts_all <- as.matrix(read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/OmniATAC_peaks/OmniATAC_q005_multicov_forDESeq.tsv",sep="\t",row.names="contig_start_end"))
+
+dfAnnotation_all <- read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/OmniATAC_peaks/OmniATAC_ImpulseDE2_sample_matrix.tsv", sep="\t", row.names=1)
+
+dfAnnotation_all
+
+library(ImpulseDE2)
+
+objectImpulseDE2_all <- runImpulseDE2(
+  matCountData    = matObservedCounts_all, 
+  dfAnnotation    = dfAnnotation_all,
+  boolCaseCtrl    = FALSE,
+  boolIdentifyTransients = TRUE,
+  vecConfounders  = NULL,
+  scaNProc        = 8 )
+```
+
+```{r}
+library(ggplot2)
+library(ImpulseDE2)
+
+gene <- "phaw_50.015400b_504316_504771"
+
+pdfname <- paste(gene, "_all_close.pdf", sep = "")
+
+pdf(file = pdfname, width = 7, height = 5)
+
+lsgplotsGenes <- plotGenes(
+  vecGeneIDs       = {gene},
+  scaNTopIDs       = NULL,
+  objectImpulseDE2 = objectImpulseDE2_all,
+  boolCaseCtrl     = FALSE,
+  dirOut           = NULL,
+  strFileName      = NULL,
+  vecRefPval       = NULL, 
+  strNameRefMethod = NULL)
+print(lsgplotsGenes[[1]])
+
+dev.off()
+```
+
+
+```{r}
+write.csv(objectImpulseDE2_all$dfImpulseDE2Results, 
+          file="OmniATAC-Seq_ImpulseDE2_allstages.csv")
+```
+
+
+
+
+```{r}
+library("rlist")
+
+OIDE2_object <- objectImpulseDE2@lsModelFits$case
+
+excluded_points <- c("S21A", "S21B", "S22A", "S22B")
+
+OIDE2_len <- length(OIDE2_object)
+
+maxim <- vector("numeric", OIDE2_len)
+dummy <- vector("list", OIDE2_len)
+region_names <- names(OIDE2_object)
+
+i <- 1
+df <- data.frame()
+
+for (item in OIDE2_object) {
+  dummy[[i]] <- unname(item$lsImpulseFit$vecImpulseValue)
+  max_val_pos <- which.max(unname(item$lsImpulseFit$vecImpulseValue))
+  if (max_val_pos >= 17) {
+    max_val_pos <- max_val_pos + 4
+  }
+  maxim[i] <- which.max(unname(item$lsImpulseFit$vecImpulseValue))
+  i <- i + 1
+}
+
+ImpulseModelFits <- data.frame(matrix(unlist(dummy), nrow=length(dummy), byrow=T))
+names(ImpulseModelFits)  <- dfAnnotation$Sample[dfAnnotation$Sample %in% excluded_points]
+ImpulseModelFits$region_names <- region_names
+ImpulseModelFits$maximum <- maxim
+```
+
+
+```{r}
+write.csv(ImpulseModelFits, 
+          file="OmniATAC-Seq_ImpulseDE2_noS21S22_modelfits.csv")
+```
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+

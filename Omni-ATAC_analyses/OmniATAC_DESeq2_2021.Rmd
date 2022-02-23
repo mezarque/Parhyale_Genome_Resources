@@ -1,0 +1,114 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library("DESeq2")
+library("edgeR")
+library("dplyr")
+```
+
+
+```{r}
+#load the sample files into memory
+
+#First, load the table as a matrix
+cts_pre <- as.matrix(read.csv("OmniATAC_bothruns_multicov_forDESeq.tsv",sep="\t",row.names="contig_start_end"))
+
+#In the c(), list any problematic samples to remove from the analysis
+
+#remove_stages <- c("S21A", "S21B", "S22A", "S22B")
+removed_stages <- c()
+cts <- cts_pre[ ,! colnames(cts_pre) %in% removed_stages]
+
+#Load in the data on the stages and replicates
+coldata <- read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/OmniATAC_peaks/DESeq_sample_info.tsv", sep="\t", row.names=1)
+coldata <- coldata[,c("stage","replicate")]
+coldata <- coldata[rownames(coldata) %in% colnames(cts), ]
+
+#check to make sure the file is correct
+head(cts,2)
+
+#check to make sure coldata names match with cts names, in the right order
+all(rownames(coldata) %in% colnames(cts))
+
+#Check for the number of NAs
+sum(is.na(cts))
+
+#Print the dimensions of the matrix
+dim(cts)
+```
+
+```{r}
+cts1 <- cts[, c("S13A", "S13B", "S19A", "S19B")]
+cts2 <- cts[, c("S19A", "S19B", "S21A", "S21B")]
+cts3 <- cts[, c("S21A", "S21B", "S23A", "S23B")]
+```
+
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata[rownames(coldata) %in% colnames(cts), ],
+                              design = ~stage)
+dds1 <- DESeqDataSetFromMatrix(countData = cts1,
+                              colData = coldata[rownames(coldata) %in% colnames(cts1), ],
+                              design = ~stage)
+
+dds2 <- DESeqDataSetFromMatrix(countData = cts2,
+                              colData = coldata[rownames(coldata) %in% colnames(cts2), ],
+                              design = ~stage)
+
+dds3 <- DESeqDataSetFromMatrix(countData = cts3,
+                              colData = coldata[rownames(coldata) %in% colnames(cts3), ],
+                              design = ~stage)
+```
+
+```{r}
+dds <- DESeq(dds)
+dds1 <- DESeq(dds1)
+dds2 <- DESeq(dds2)
+dds3 <- DESeq(dds3)
+```
+
+```{r}
+res <- results(dds, alpha = 0.05)
+res1 <- results(dds1, alpha = 0.05)
+res2 <- results(dds2, alpha = 0.05)
+res3 <- results(dds3, alpha = 0.05)
+```
+
+```{r}
+summary(res)
+summary(res1)
+summary(res2)
+summary(res3)
+
+sum(res$padj < 0.05, na.rm=TRUE)
+sum(res1$padj < 0.05, na.rm=TRUE)
+sum(res2$padj < 0.05, na.rm=TRUE)
+sum(res3$padj < 0.05, na.rm=TRUE)
+
+resOrdered1 <- res1[order(res1$padj), ]
+write.csv(as.data.frame(resOrdered1), file="S19_vs_S13_OmniATACSeq_results.csv")
+
+resOrdered2 <- res2[order(res2$padj), ]
+write.csv(as.data.frame(resOrdered2), file="S21_vs_S19_OmniATACSeq_results.csv")
+
+resOrdered3 <- res3[order(res3$padj), ]
+write.csv(as.data.frame(resOrdered3), file="S23_vs_S21_OmniATACSeq_results.csv")
+
+save.image(file='OmniATAC-Seq_DESeq2_2021.RData')
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+

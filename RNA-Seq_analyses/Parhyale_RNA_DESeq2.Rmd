@@ -1,0 +1,155 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library("DESeq2")
+library("edgeR")
+library("dplyr")
+```
+
+```{r}
+setwd("~/Labwork/Bioinformatics/Parhyale_RNA-Seq/SLURM_scripts")
+
+cts_pre <- as.matrix(read.csv("kallisto.gene.counts.matrix",sep="\t",row.names=1))
+cts <- round(cts_pre, digits = 0)
+
+coldata <- read.csv("DESeq2_RNAseq_sample_info.tsv", sep="\t", row.names=1)
+coldata <- coldata[,c("stage","replicate")]
+coldata <- coldata[rownames(coldata) %in% colnames(cts), ]
+
+#check to make sure coldata names match with cts names, in the right order
+all(rownames(coldata) %in% colnames(cts))
+
+#Check for the number of NAs
+sum(is.na(cts))
+
+#Print the dimensions of the matrix
+dim(cts)
+head(cts, 10)
+```
+
+```{r}
+cts1 <- cts[, c("S13A1", "S13B1", "S13C1", "S19A1", "S19B1", "S19C1")]
+cts2 <- cts[, c("S19A1", "S19B1", "S19C1", "S21A", "S21B", "S21C")]
+cts3 <- cts[, c("S21A", "S21B", "S21C", "S23A", "S23B", "S23C")]
+```
+
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata[rownames(coldata) %in% colnames(cts), ],
+                              design = ~stage)
+dds1 <- DESeqDataSetFromMatrix(countData = cts1,
+                              colData = coldata[rownames(coldata) %in% colnames(cts1), ],
+                              design = ~stage)
+
+dds2 <- DESeqDataSetFromMatrix(countData = cts2,
+                              colData = coldata[rownames(coldata) %in% colnames(cts2), ],
+                              design = ~stage)
+
+dds3 <- DESeqDataSetFromMatrix(countData = cts3,
+                              colData = coldata[rownames(coldata) %in% colnames(cts3), ],
+                              design = ~stage)
+
+```
+
+
+```{r}
+dds <- DESeq(dds)
+dds1 <- DESeq(dds1)
+dds2 <- DESeq(dds2)
+dds3 <- DESeq(dds3)
+```
+
+```{r}
+res <- results(dds, alpha = 0.05)
+res1 <- results(dds1, alpha = 0.05)
+res2 <- results(dds2, alpha = 0.05)
+res3 <- results(dds3, alpha = 0.05)
+```
+
+```{r}
+summary(res)
+summary(res1)
+summary(res2)
+summary(res3)
+
+sum(res$padj < 0.05, na.rm=TRUE)
+sum(res1$padj < 0.05, na.rm=TRUE)
+sum(res2$padj < 0.05, na.rm=TRUE)
+sum(res3$padj < 0.05, na.rm=TRUE)
+
+resOrdered1 <- res1[order(res1$padj), ]
+write.csv(as.data.frame(resOrdered1), file="S19_vs_S13_RNASeq_results.csv", quote = FALSE, sep = "\t")
+
+resOrdered2 <- res2[order(res2$padj), ]
+write.csv(as.data.frame(resOrdered2), file="S21_vs_S19_RNASeq_results.csv", quote = FALSE, sep = "\t")
+
+resOrdered3 <- res3[order(res3$padj), ]
+write.csv(as.data.frame(resOrdered3), file="S23_vs_S21_RNASeq_results.csv", quote = FALSE, sep = "\t")
+```
+
+```{r}
+res1LFC <- lfcShrink(dds1, coef="stage_S19_vs_S13", type="apeglm")
+res2LFC <- lfcShrink(dds2, coef="stage_S21_vs_S19", type="apeglm")
+res3LFC <- lfcShrink(dds3, coef="stage_S23_vs_S21", type="apeglm")
+```
+
+```{r}
+par(mfrow=c(1,3))
+xlim <- c(1, 10e5); ylim <- c(-5,5)
+DESeq2::plotMA(res1LFC, xlim=xlim, ylim=ylim, main="S19_vs_S13")
+DESeq2::plotMA(res2LFC, xlim=xlim, ylim=ylim, main="S21_vs_S19")
+DESeq2::plotMA(res3LFC, xlim=xlim, ylim=ylim, main="S23_vs_S21")
+```
+
+```{r}
+plotCounts(dds, gene=which.min(res1$padj), intgroup="stage")
+```
+
+```{r}
+library("pheatmap")
+
+ntd <- normTransform(dds)
+select <- order(rowMeans(counts(dds,normalized=TRUE)),
+                decreasing=TRUE)[1:20]
+df <- as.data.frame(colData(dds)[,c("stage", "replicate")])
+pheatmap(assay(ntd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+         cluster_cols=FALSE, annotation_col=df)
+```
+
+```{r}
+vsd <- vst(dds, blind=FALSE)
+sampleDists <- dist(t(assay(vsd)))
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(vsd$stage, vsd$replicate, sep="-")
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+
+```{r}
+plotPCA(vsd, intgroup=c("stage", "replicate"))
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+

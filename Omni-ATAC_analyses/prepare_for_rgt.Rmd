@@ -1,0 +1,157 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(universalmotif)
+library(stringr)
+
+#Test case just using a single motif name
+
+collection <- data.frame(matrix(ncol = 10, nrow = 0), stringsAsFactors = FALSE)
+columns <- c("name", "fullname", "version", "symbol", "family", "uniprot_id", "source", "taxonomic group", "species", "FPR")
+colnames(collection) <- columns
+
+file_list <- list("./MA0001.2.jaspar")
+
+for (file in file_list){
+  motif_string <- file
+  
+  motif <- read_jaspar(motif_name)
+  fields <- c(motif@name, paste(motif@altname,motif@name, sep = "_"), "JASPAR_nr", motif@altname, ".", ".", ".", ".", ".", ".")
+  collection[nrow(collection) + 1, ] <- fields
+  
+  motif_out <- str_replace(motif_string, ".jaspar", ".pwm")
+  write_matrix(motif, motif_out, headers = FALSE, overwrite = TRUE)
+}
+
+write.table(collection, file="jaspar_core_nr.mtf", quote=FALSE, sep="\t", row.names = FALSE, col.names = FALSE)
+collection
+```
+
+```{r}
+
+collection <- data.frame(matrix(ncol = 10, nrow = 0), stringsAsFactors = FALSE)
+columns <- c("name", "fullname", "version", "symbol", "family", "uniprot_id", "source", "taxonomic group", "species", "FPR")
+colnames(collection) <- columns
+
+file_list <- list.files(path=".", pattern="*.jaspar", full.names=TRUE, recursive=FALSE)
+
+for (file in file_list){
+  motif_string <- file
+  
+  motif <- read_jaspar(motif_string)
+  fields <- c(motif@name, paste(motif@altname,motif@name, sep = "_"), "JASPAR_nr", motif@altname, ".", ".", ".", ".", ".", ".")
+  collection[nrow(collection) + 1, ] <- fields
+  
+  motif_out <- str_replace(motif_string, ".jaspar", ".pwm")
+  write_matrix(motif, motif_out, headers = FALSE, overwrite = TRUE)
+}
+
+write.table(collection, file="jaspar_core_nr.mtf", quote=FALSE, sep="\t", row.names = FALSE, col.names = FALSE)
+collection
+```
+
+```{r}
+library("TFBSTools")
+library("JASPAR2018")
+
+full_csv <- read.csv("~/Labwork/Bioinformatics/Omni-ATAC-Seq/jaspar_core_nr.mtf", sep = "\t", header = FALSE)
+
+full_list <- full_csv$V1
+full_list <- c("MA0072.1")
+UNIPROT_IDs <- c()
+
+for (JASPAR_ID in full_list){
+  print(JASPAR_ID)
+  pfm <- getMatrixByID(JASPAR2018, JASPAR_ID)
+  return(pfm)
+  print(pfm)
+  UNIPROT_ID <- pfm@tags$acc
+  UNIPROT_IDs <- append(UNIPROT_IDs, UNIPROT_ID)
+}
+
+UNIPROT_IDs
+pfm
+```
+
+```{r}
+library("TFBSTools")
+library("JASPAR2020")
+
+full_csv <- read.csv("~/rgtdata/motifs/jaspar_core_nr.mtf", sep = "\t", header = FALSE)
+
+full_list <- full_csv$V1
+UNIPROT_IDs <- c()
+
+for (JASPAR_ID in full_list){
+  pfm <- tryCatch({
+    pfm <- getMatrixByID(JASPAR2020, JASPAR_ID)
+    return(pfm)
+  },
+  error = function(cond) {
+    return('none') })
+  
+  if(pfm == 'none'){
+    next
+  }
+  UNIPROT_ID <- pfm@tags$acc
+  print(UNIPROT_I)
+}
+
+UNIPROT_IDs
+```
+
+
+```{bash}
+#Using the below cell requires:
+module load r/4.0.3
+module load r-packages/default
+module load gsl
+module load libpng
+```
+
+
+```{r}
+
+
+library("TFBSTools")
+library("JASPAR2020")
+
+full_csv <- read.csv("~/rgtdata/motifs/jaspar_core_nr.mtf", sep = "\t", header = FALSE)
+
+full_list <- full_csv$V1
+UNIPROT_IDs <- vector("list", length(full_list))
+Species_IDs <- vector("list", length(full_list))
+
+i = 1
+for (JASPAR_ID in full_list){
+  pfm <- getMatrixByID(JASPAR2020, JASPAR_ID)
+  UNIPROT_ID <- pfm@tags$acc
+  Species_ID <- pfm@tags$species
+  UNIPROT_IDs[i] <- UNIPROT_ID
+  Species_IDs[i] <- Species_ID
+  i = i + 1
+}
+
+
+UNIPROT_chars = unlist(UNIPROT_IDs)
+Species_chars = unlist(Species_IDs)
+JASPAR_to_UNIPROT = data.frame(full_list, UNIPROT_chars, Species_chars)
+write.table(JASPAR_to_UNIPROT,"jaspar_core_nr_UNIPROT_IDs_withspecies.csv", row.names = FALSE, sep = "\t")
+
+```
+
+MA0001.2
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
